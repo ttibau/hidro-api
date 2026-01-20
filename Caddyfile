@@ -1,0 +1,3 @@
+api-hidro.t2tech.site {
+  reverse_proxy api:3000
+}
