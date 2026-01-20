@@ -51,9 +51,9 @@ export class DashboardService {
     // Sensores por status lógico
     const sensorStatusResult = await pool.query(`
       SELECT 
-        COUNT(*) FILTER (WHERE get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'ATIVO') as active,
-        COUNT(*) FILTER (WHERE get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'ATRASADO') as delayed,
-        COUNT(*) FILTER (WHERE get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'OFFLINE') as offline
+        COUNT(*) FILTER (WHERE estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'ATIVO') as active,
+        COUNT(*) FILTER (WHERE estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'ATRASADO') as delayed,
+        COUNT(*) FILTER (WHERE estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'OFFLINE') as offline
       FROM estufa.sensor s
     `);
     const sensors_active = parseInt(sensorStatusResult.rows[0].active || "0");
@@ -107,7 +107,7 @@ export class DashboardService {
         AVG(t.hum_pct) as avg_humidity,
         COUNT(DISTINCT s.id) as sensor_count,
         BOOL_OR(
-          get_sensor_status(s.last_seen_at, s.expected_interval_s) IN ('ATRASADO', 'OFFLINE')
+          estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) IN ('ATRASADO', 'OFFLINE')
         ) as has_alert
       FROM estufa.greenhouse g
       LEFT JOIN estufa.sensor s ON s.greenhouse_id = g.id
@@ -148,7 +148,7 @@ export class DashboardService {
         s.device_key,
         s.greenhouse_id,
         g.name as greenhouse_name,
-        get_sensor_status(s.last_seen_at, s.expected_interval_s) as status,
+        estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) as status,
         s.last_seen_at,
         CASE 
           WHEN s.last_seen_at IS NOT NULL THEN
@@ -157,7 +157,7 @@ export class DashboardService {
         END as minutes_since_last_seen
       FROM estufa.sensor s
       INNER JOIN estufa.greenhouse g ON g.id = s.greenhouse_id
-      WHERE get_sensor_status(s.last_seen_at, s.expected_interval_s) IN ('ATRASADO', 'OFFLINE')
+      WHERE estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) IN ('ATRASADO', 'OFFLINE')
       ORDER BY s.last_seen_at DESC NULLS LAST
       LIMIT $1
     `, [limit]);
@@ -182,7 +182,7 @@ export class DashboardService {
 
     const result = await pool.query(`
       SELECT 
-        COUNT(*) FILTER (WHERE get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'ATIVO') as active,
+        COUNT(*) FILTER (WHERE estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'ATIVO') as active,
         COUNT(*) as total
       FROM estufa.sensor s
     `);

@@ -113,7 +113,7 @@ export class ViewsService {
         s.name as sensor_name,
         s.greenhouse_id,
         g.name as greenhouse_name,
-        get_sensor_status(s.last_seen_at, s.expected_interval_s) as status,
+        estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) as status,
         s.last_seen_at,
         t.received_at as last_telemetry_at,
         t.temp_c,
@@ -142,7 +142,7 @@ export class ViewsService {
         s.name as sensor_name,
         s.greenhouse_id,
         g.name as greenhouse_name,
-        get_sensor_status(s.last_seen_at, s.expected_interval_s) as status,
+        estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) as status,
         s.last_seen_at,
         t.received_at as last_telemetry_at,
         t.temp_c,
@@ -172,7 +172,7 @@ export class ViewsService {
         s.name as sensor_name,
         s.greenhouse_id,
         g.name as greenhouse_name,
-        get_sensor_status(s.last_seen_at, s.expected_interval_s) as status,
+        estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) as status,
         s.last_seen_at,
         t.received_at as last_telemetry_at,
         t.temp_c,
@@ -187,7 +187,7 @@ export class ViewsService {
         ORDER BY received_at DESC
         LIMIT 1
       ) t ON true
-      WHERE get_sensor_status(s.last_seen_at, s.expected_interval_s) IN ('ATRASADO', 'OFFLINE')
+      WHERE estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) IN ('ATRASADO', 'OFFLINE')
       ORDER BY s.last_seen_at DESC NULLS LAST
     `);
     return result.rows;

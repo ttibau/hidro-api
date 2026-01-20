@@ -7,13 +7,13 @@
 BEGIN;
 
 -- Limpar dados de teste anteriores (se existirem)
-DELETE FROM telemetry WHERE sensor_id IN (
-  SELECT id FROM sensor WHERE device_key LIKE 'test-%'
+DELETE FROM estufa.telemetry WHERE sensor_id IN (
+  SELECT id FROM estufa.sensor WHERE device_key LIKE 'test-%'
 );
-DELETE FROM sensor WHERE device_key LIKE 'test-%';
+DELETE FROM estufa.sensor WHERE device_key LIKE 'test-%';
 
 -- Criar estufa de teste (se não existir)
-INSERT INTO greenhouse (name, location)
+INSERT INTO estufa.greenhouse (name, location)
 VALUES ('Estufa de Teste', 'Ambiente de Testes')
 ON CONFLICT DO NOTHING;
 
@@ -23,14 +23,14 @@ DECLARE
   v_greenhouse_id BIGINT;
 BEGIN
   SELECT id INTO v_greenhouse_id 
-  FROM greenhouse 
+  FROM estufa.greenhouse 
   WHERE name = 'Estufa de Teste' 
   LIMIT 1;
 
   -- ============================================================================
   -- Cenário 1: Sensor ATIVO (última leitura há 50 minutos, intervalo = 1h)
   -- ============================================================================
-  INSERT INTO sensor (greenhouse_id, device_key, sensor_type, name, expected_interval_s, last_seen_at)
+  INSERT INTO estufa.sensor (greenhouse_id, device_key, sensor_type, name, expected_interval_s, last_seen_at)
   VALUES (
     v_greenhouse_id,
     'test-sensor-ativo-01',
@@ -41,7 +41,7 @@ BEGIN
   );
 
   -- Adicionar telemetria para o sensor ativo
-  INSERT INTO telemetry (sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw)
+  INSERT INTO estufa.telemetry (sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw)
   SELECT 
     s.id,
     NOW() - INTERVAL '50 minutes',
@@ -50,13 +50,13 @@ BEGIN
     -72,
     3000,
     '{"test": true}'::jsonb
-  FROM sensor s
+  FROM estufa.sensor s
   WHERE s.device_key = 'test-sensor-ativo-01';
 
   -- ============================================================================
   -- Cenário 2: Sensor ATRASADO (última leitura há 2h10min, intervalo = 1h)
   -- ============================================================================
-  INSERT INTO sensor (greenhouse_id, device_key, sensor_type, name, expected_interval_s, last_seen_at)
+  INSERT INTO estufa.sensor (greenhouse_id, device_key, sensor_type, name, expected_interval_s, last_seen_at)
   VALUES (
     v_greenhouse_id,
     'test-sensor-atrasado-01',
@@ -67,7 +67,7 @@ BEGIN
   );
 
   -- Adicionar telemetria para o sensor atrasado
-  INSERT INTO telemetry (sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw)
+  INSERT INTO estufa.telemetry (sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw)
   SELECT 
     s.id,
     NOW() - INTERVAL '2 hours 10 minutes',
@@ -76,13 +76,13 @@ BEGIN
     -75,
     7800,
     '{"test": true}'::jsonb
-  FROM sensor s
+  FROM estufa.sensor s
   WHERE s.device_key = 'test-sensor-atrasado-01';
 
   -- ============================================================================
   -- Cenário 3: Sensor OFFLINE (última leitura há 3h30min, intervalo = 1h)
   -- ============================================================================
-  INSERT INTO sensor (greenhouse_id, device_key, sensor_type, name, expected_interval_s, last_seen_at)
+  INSERT INTO estufa.sensor (greenhouse_id, device_key, sensor_type, name, expected_interval_s, last_seen_at)
   VALUES (
     v_greenhouse_id,
     'test-sensor-offline-01',
@@ -93,7 +93,7 @@ BEGIN
   );
 
   -- Adicionar telemetria para o sensor offline
-  INSERT INTO telemetry (sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw)
+  INSERT INTO estufa.telemetry (sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw)
   SELECT 
     s.id,
     NOW() - INTERVAL '3 hours 30 minutes',
@@ -102,13 +102,13 @@ BEGIN
     -80,
     12600,
     '{"test": true}'::jsonb
-  FROM sensor s
+  FROM estufa.sensor s
   WHERE s.device_key = 'test-sensor-offline-01';
 
   -- ============================================================================
   -- Cenário 4: Sensor sem telemetria (last_seen_at NULL)
   -- ============================================================================
-  INSERT INTO sensor (greenhouse_id, device_key, sensor_type, name, expected_interval_s, last_seen_at)
+  INSERT INTO estufa.sensor (greenhouse_id, device_key, sensor_type, name, expected_interval_s, last_seen_at)
   VALUES (
     v_greenhouse_id,
     'test-sensor-nunca-visto',
@@ -121,7 +121,7 @@ BEGIN
   -- ============================================================================
   -- Cenário 5: Sensor com intervalo curto (15 min) - ATIVO
   -- ============================================================================
-  INSERT INTO sensor (greenhouse_id, device_key, sensor_type, name, expected_interval_s, last_seen_at)
+  INSERT INTO estufa.sensor (greenhouse_id, device_key, sensor_type, name, expected_interval_s, last_seen_at)
   VALUES (
     v_greenhouse_id,
     'test-sensor-curto-ativo',
@@ -131,7 +131,7 @@ BEGIN
     NOW() - INTERVAL '10 minutes'
   );
 
-  INSERT INTO telemetry (sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw)
+  INSERT INTO estufa.telemetry (sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw)
   SELECT 
     s.id,
     NOW() - INTERVAL '10 minutes',
@@ -140,13 +140,13 @@ BEGIN
     -68,
     600,
     '{"test": true}'::jsonb
-  FROM sensor s
+  FROM estufa.sensor s
   WHERE s.device_key = 'test-sensor-curto-ativo';
 
   -- ============================================================================
   -- Cenário 6: Sensor com intervalo longo (6 horas) - ATIVO
   -- ============================================================================
-  INSERT INTO sensor (greenhouse_id, device_key, sensor_type, name, expected_interval_s, last_seen_at)
+  INSERT INTO estufa.sensor (greenhouse_id, device_key, sensor_type, name, expected_interval_s, last_seen_at)
   VALUES (
     v_greenhouse_id,
     'test-sensor-longo-ativo',
@@ -156,7 +156,7 @@ BEGIN
     NOW() - INTERVAL '8 hours'
   );
 
-  INSERT INTO telemetry (sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw)
+  INSERT INTO estufa.telemetry (sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw)
   SELECT 
     s.id,
     NOW() - INTERVAL '8 hours',
@@ -165,7 +165,7 @@ BEGIN
     -78,
     28800,
     '{"test": true}'::jsonb
-  FROM sensor s
+  FROM estufa.sensor s
   WHERE s.device_key = 'test-sensor-longo-ativo';
 
 END $$;
@@ -182,14 +182,14 @@ SELECT
   s.expected_interval_s,
   s.last_seen_at,
   EXTRACT(EPOCH FROM (NOW() - s.last_seen_at)) / 60 as minutes_since_last_seen,
-  get_sensor_status(s.last_seen_at, s.expected_interval_s) as status,
+  estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) as status,
   CASE 
-    WHEN get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'ATIVO' THEN '✅'
-    WHEN get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'ATRASADO' THEN '⚠️'
-    WHEN get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'OFFLINE' THEN '❌'
+    WHEN estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'ATIVO' THEN '✅'
+    WHEN estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'ATRASADO' THEN '⚠️'
+    WHEN estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'OFFLINE' THEN '❌'
     ELSE '❓'
   END as icon
-FROM sensor s
+FROM estufa.sensor s
 WHERE s.device_key LIKE 'test-%'
 ORDER BY s.device_key;
 
@@ -203,10 +203,10 @@ SELECT
   t.rssi,
   t.received_at,
   EXTRACT(EPOCH FROM (NOW() - t.received_at)) / 60 as minutes_ago
-FROM sensor s
+FROM estufa.sensor s
 LEFT JOIN LATERAL (
   SELECT temp_c, hum_pct, rssi, received_at
-  FROM telemetry
+  FROM estufa.telemetry
   WHERE sensor_id = s.id
   ORDER BY received_at DESC
   LIMIT 1
@@ -226,7 +226,7 @@ SELECT
     WHEN device_key = 'test-sensor-curto-ativo' THEN 'ATIVO'
     WHEN device_key = 'test-sensor-longo-ativo' THEN 'ATIVO'
   END as status_esperado,
-  get_sensor_status(last_seen_at, expected_interval_s) as status_calculado,
+  estufa.get_sensor_status(last_seen_at, expected_interval_s) as status_calculado,
   CASE 
     WHEN (
       CASE 
@@ -237,11 +237,11 @@ SELECT
         WHEN device_key = 'test-sensor-curto-ativo' THEN 'ATIVO'
         WHEN device_key = 'test-sensor-longo-ativo' THEN 'ATIVO'
       END
-    ) = get_sensor_status(last_seen_at, expected_interval_s) THEN '✅ PASS'
+    ) = estufa.get_sensor_status(last_seen_at, expected_interval_s) THEN '✅ PASS'
     ELSE '❌ FAIL'
   END as resultado,
   device_key
-FROM sensor
+FROM estufa.sensor
 WHERE device_key LIKE 'test-%'
 ORDER BY device_key;
 
@@ -266,10 +266,10 @@ BEGIN
   RAISE NOTICE '  curl http://localhost:3000/sensors | jq';
   RAISE NOTICE '';
   RAISE NOTICE 'Limpar dados de teste:';
-  RAISE NOTICE '  DELETE FROM telemetry WHERE sensor_id IN (';
-  RAISE NOTICE '    SELECT id FROM sensor WHERE device_key LIKE ''test-%%''';
+  RAISE NOTICE '  DELETE FROM estufa.telemetry WHERE sensor_id IN (';
+  RAISE NOTICE '    SELECT id FROM estufa.sensor WHERE device_key LIKE ''test-%%''';
   RAISE NOTICE '  );';
-  RAISE NOTICE '  DELETE FROM sensor WHERE device_key LIKE ''test-%%'';';
+  RAISE NOTICE '  DELETE FROM estufa.sensor WHERE device_key LIKE ''test-%%'';';
   RAISE NOTICE '========================================';
   RAISE NOTICE '';
 END $$;
