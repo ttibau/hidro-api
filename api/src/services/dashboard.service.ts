@@ -103,8 +103,10 @@ export class DashboardService {
         COUNT(DISTINCT s.id) as sensor_count,
         CASE 
           WHEN EXISTS (
-            SELECT 1 FROM estufa.vw_ambient_alert_offline_10m a
-            WHERE a.greenhouse_id = g.id
+            SELECT 1 
+            FROM estufa.vw_ambient_alert_offline_10m a
+            INNER JOIN estufa.sensor s_alert ON s_alert.id = a.id
+            WHERE s_alert.greenhouse_id = g.id
           ) THEN true
           ELSE false
         END as has_alert
@@ -134,27 +136,32 @@ export class DashboardService {
   async getRecentAlerts(limit: number = 10): Promise<RecentAlert[]> {
     const pool = getPool();
 
-    // Primeiro, vamos verificar quais colunas a view realmente retorna
+    // A view tem: id, device_key, name, greenhouse_name, status, updated_at, minutes_offline
+    // Precisamos fazer JOIN com sensor para obter greenhouse_id e last_telemetry_at
     const result = await pool.query(`
       SELECT 
-        sensor_id,
-        sensor_name,
-        device_key,
-        greenhouse_id,
-        greenhouse_name,
-        status,
-        status_updated_at,
-        last_telemetry_at,
-        CASE 
-          WHEN last_telemetry_at IS NOT NULL THEN
-            EXTRACT(EPOCH FROM (now() - last_telemetry_at)) / 60
-          WHEN status_updated_at IS NOT NULL THEN
-            EXTRACT(EPOCH FROM (now() - status_updated_at)) / 60
-          ELSE NULL
-        END as minutes_offline
-      FROM estufa.vw_ambient_alert_offline_10m
+        a.id as sensor_id,
+        a.name as sensor_name,
+        a.device_key,
+        s.greenhouse_id,
+        a.greenhouse_name,
+        a.status,
+        a.updated_at as status_updated_at,
+        lt.received_at as last_telemetry_at,
+        COALESCE(a.minutes_offline, 
+          CASE 
+            WHEN lt.received_at IS NOT NULL THEN
+              EXTRACT(EPOCH FROM (now() - lt.received_at)) / 60
+            WHEN a.updated_at IS NOT NULL THEN
+              EXTRACT(EPOCH FROM (now() - a.updated_at)) / 60
+            ELSE NULL
+          END
+        ) as minutes_offline
+      FROM estufa.vw_ambient_alert_offline_10m a
+      INNER JOIN estufa.sensor s ON s.id = a.id
+      LEFT JOIN estufa.vw_ambient_last_telemetry lt ON lt.sensor_id = a.id
       ORDER BY 
-        COALESCE(last_telemetry_at, status_updated_at) DESC NULLS LAST
+        COALESCE(lt.received_at, a.updated_at) DESC NULLS LAST
       LIMIT $1
     `, [limit]);
 
