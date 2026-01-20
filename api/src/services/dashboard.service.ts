@@ -104,8 +104,7 @@ export class DashboardService {
         CASE 
           WHEN EXISTS (
             SELECT 1 FROM estufa.vw_ambient_alert_offline_10m a
-            INNER JOIN estufa.sensor s2 ON s2.id = a.sensor_id
-            WHERE s2.greenhouse_id = g.id
+            WHERE a.greenhouse_id = g.id
           ) THEN true
           ELSE false
         END as has_alert
@@ -135,26 +134,27 @@ export class DashboardService {
   async getRecentAlerts(limit: number = 10): Promise<RecentAlert[]> {
     const pool = getPool();
 
+    // Primeiro, vamos verificar quais colunas a view realmente retorna
     const result = await pool.query(`
       SELECT 
-        ao.sensor_id,
-        ao.sensor_name,
-        ao.device_key,
-        ao.greenhouse_id,
-        ao.greenhouse_name,
-        ao.status,
-        ao.status_updated_at,
-        ao.last_telemetry_at,
+        sensor_id,
+        sensor_name,
+        device_key,
+        greenhouse_id,
+        greenhouse_name,
+        status,
+        status_updated_at,
+        last_telemetry_at,
         CASE 
-          WHEN ao.last_telemetry_at IS NOT NULL THEN
-            EXTRACT(EPOCH FROM (now() - ao.last_telemetry_at)) / 60
-          WHEN ao.status_updated_at IS NOT NULL THEN
-            EXTRACT(EPOCH FROM (now() - ao.status_updated_at)) / 60
+          WHEN last_telemetry_at IS NOT NULL THEN
+            EXTRACT(EPOCH FROM (now() - last_telemetry_at)) / 60
+          WHEN status_updated_at IS NOT NULL THEN
+            EXTRACT(EPOCH FROM (now() - status_updated_at)) / 60
           ELSE NULL
         END as minutes_offline
-      FROM estufa.vw_ambient_alert_offline_10m ao
+      FROM estufa.vw_ambient_alert_offline_10m
       ORDER BY 
-        COALESCE(ao.last_telemetry_at, ao.status_updated_at) DESC NULLS LAST
+        COALESCE(last_telemetry_at, status_updated_at) DESC NULLS LAST
       LIMIT $1
     `, [limit]);
 
