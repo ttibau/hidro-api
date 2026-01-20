@@ -2,7 +2,8 @@ import { getPool } from "../db/config";
 
 export interface DashboardSummary {
   total_greenhouses: number;
-  sensors_online: number;
+  sensors_active: number;
+  sensors_delayed: number;
   sensors_offline: number;
   active_alerts: number;
   avg_temperature: number | null;
@@ -25,10 +26,9 @@ export interface RecentAlert {
   device_key: string;
   greenhouse_id: number;
   greenhouse_name: string;
-  status: "online" | "offline" | null;
-  status_updated_at: Date | null;
-  last_telemetry_at: Date | null;
-  minutes_offline: number | null;
+  status: "ATIVO" | "ATRASADO" | "OFFLINE";
+  last_seen_at: Date | null;
+  minutes_since_last_seen: number | null;
 }
 
 export interface QuickSummary {
@@ -48,36 +48,41 @@ export class DashboardService {
     );
     const total_greenhouses = parseInt(greenhouseResult.rows[0].total);
 
-    // Sensores online e offline
+    // Sensores por status lógico
     const sensorStatusResult = await pool.query(`
       SELECT 
-        COUNT(*) FILTER (WHERE ast.status = 'online') as online,
-        COUNT(*) FILTER (WHERE ast.status = 'offline' OR ast.status IS NULL) as offline
+        COUNT(*) FILTER (WHERE get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'ATIVO') as active,
+        COUNT(*) FILTER (WHERE get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'ATRASADO') as delayed,
+        COUNT(*) FILTER (WHERE get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'OFFLINE') as offline
       FROM estufa.sensor s
-      LEFT JOIN estufa.ambient_status ast ON ast.sensor_id = s.id
-      WHERE s.sensor_type = 'ambient'
     `);
-    const sensors_online = parseInt(sensorStatusResult.rows[0].online || "0");
+    const sensors_active = parseInt(sensorStatusResult.rows[0].active || "0");
+    const sensors_delayed = parseInt(sensorStatusResult.rows[0].delayed || "0");
     const sensors_offline = parseInt(sensorStatusResult.rows[0].offline || "0");
 
-    // Alertas ativos (sensores offline há mais de 10 minutos)
-    const alertsResult = await pool.query(
-      "SELECT COUNT(*) as total FROM estufa.vw_ambient_alert_offline_10m"
-    );
-    const active_alerts = parseInt(alertsResult.rows[0].total);
+    // Alertas ativos (sensores atrasados ou offline)
+    const active_alerts = sensors_delayed + sensors_offline;
 
     // Temperatura e umidade média (últimas telemetrias de cada sensor)
     const avgResult = await pool.query(`
       SELECT 
-        AVG(lt.temp_c) as avg_temp,
-        AVG(lt.hum_pct) as avg_hum
-      FROM estufa.vw_ambient_last_telemetry lt
-      WHERE lt.temp_c IS NOT NULL AND lt.hum_pct IS NOT NULL
+        AVG(t.temp_c) as avg_temp,
+        AVG(t.hum_pct) as avg_hum
+      FROM estufa.sensor s
+      LEFT JOIN LATERAL (
+        SELECT temp_c, hum_pct
+        FROM estufa.telemetry
+        WHERE sensor_id = s.id
+        ORDER BY received_at DESC
+        LIMIT 1
+      ) t ON true
+      WHERE t.temp_c IS NOT NULL AND t.hum_pct IS NOT NULL
     `);
 
     return {
       total_greenhouses,
-      sensors_online,
+      sensors_active,
+      sensors_delayed,
       sensors_offline,
       active_alerts,
       avg_temperature: avgResult.rows[0].avg_temp
@@ -98,21 +103,21 @@ export class DashboardService {
         g.id,
         g.name,
         g.location,
-        AVG(lt.temp_c) as avg_temperature,
-        AVG(lt.hum_pct) as avg_humidity,
+        AVG(t.temp_c) as avg_temperature,
+        AVG(t.hum_pct) as avg_humidity,
         COUNT(DISTINCT s.id) as sensor_count,
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 
-            FROM estufa.vw_ambient_alert_offline_10m a
-            INNER JOIN estufa.sensor s_alert ON s_alert.id = a.id
-            WHERE s_alert.greenhouse_id = g.id
-          ) THEN true
-          ELSE false
-        END as has_alert
+        BOOL_OR(
+          get_sensor_status(s.last_seen_at, s.expected_interval_s) IN ('ATRASADO', 'OFFLINE')
+        ) as has_alert
       FROM estufa.greenhouse g
-      LEFT JOIN estufa.sensor s ON s.greenhouse_id = g.id AND s.sensor_type = 'ambient'
-      LEFT JOIN estufa.vw_ambient_last_telemetry lt ON lt.sensor_id = s.id
+      LEFT JOIN estufa.sensor s ON s.greenhouse_id = g.id
+      LEFT JOIN LATERAL (
+        SELECT temp_c, hum_pct
+        FROM estufa.telemetry
+        WHERE sensor_id = s.id
+        ORDER BY received_at DESC
+        LIMIT 1
+      ) t ON true
       GROUP BY g.id, g.name, g.location
       ORDER BY g.id
     `);
@@ -128,40 +133,32 @@ export class DashboardService {
         ? parseFloat(row.avg_humidity.toFixed(1))
         : null,
       sensor_count: parseInt(row.sensor_count),
-      has_alert: row.has_alert,
+      has_alert: row.has_alert || false,
     }));
   }
 
-  // Alertas recentes
+  // Alertas recentes (sensores atrasados ou offline)
   async getRecentAlerts(limit: number = 10): Promise<RecentAlert[]> {
     const pool = getPool();
 
-    // A view tem: id, device_key, name, greenhouse_name, status, updated_at, minutes_offline
-    // Precisamos fazer JOIN com sensor para obter greenhouse_id e last_telemetry_at
     const result = await pool.query(`
       SELECT 
-        a.id as sensor_id,
-        a.name as sensor_name,
-        a.device_key,
+        s.id as sensor_id,
+        s.name as sensor_name,
+        s.device_key,
         s.greenhouse_id,
-        a.greenhouse_name,
-        a.status,
-        a.updated_at as status_updated_at,
-        lt.received_at as last_telemetry_at,
-        COALESCE(a.minutes_offline, 
-          CASE 
-            WHEN lt.received_at IS NOT NULL THEN
-              EXTRACT(EPOCH FROM (now() - lt.received_at)) / 60
-            WHEN a.updated_at IS NOT NULL THEN
-              EXTRACT(EPOCH FROM (now() - a.updated_at)) / 60
-            ELSE NULL
-          END
-        ) as minutes_offline
-      FROM estufa.vw_ambient_alert_offline_10m a
-      INNER JOIN estufa.sensor s ON s.id = a.id
-      LEFT JOIN estufa.vw_ambient_last_telemetry lt ON lt.sensor_id = a.id
-      ORDER BY 
-        COALESCE(lt.received_at, a.updated_at) DESC NULLS LAST
+        g.name as greenhouse_name,
+        get_sensor_status(s.last_seen_at, s.expected_interval_s) as status,
+        s.last_seen_at,
+        CASE 
+          WHEN s.last_seen_at IS NOT NULL THEN
+            EXTRACT(EPOCH FROM (now() - s.last_seen_at)) / 60
+          ELSE NULL
+        END as minutes_since_last_seen
+      FROM estufa.sensor s
+      INNER JOIN estufa.greenhouse g ON g.id = s.greenhouse_id
+      WHERE get_sensor_status(s.last_seen_at, s.expected_interval_s) IN ('ATRASADO', 'OFFLINE')
+      ORDER BY s.last_seen_at DESC NULLS LAST
       LIMIT $1
     `, [limit]);
 
@@ -172,10 +169,9 @@ export class DashboardService {
       greenhouse_id: row.greenhouse_id,
       greenhouse_name: row.greenhouse_name,
       status: row.status,
-      status_updated_at: row.status_updated_at,
-      last_telemetry_at: row.last_telemetry_at,
-      minutes_offline: row.minutes_offline
-        ? Math.round(row.minutes_offline)
+      last_seen_at: row.last_seen_at,
+      minutes_since_last_seen: row.minutes_since_last_seen
+        ? Math.round(row.minutes_since_last_seen)
         : null,
     }));
   }
@@ -186,11 +182,9 @@ export class DashboardService {
 
     const result = await pool.query(`
       SELECT 
-        COUNT(*) FILTER (WHERE ast.status = 'online') as active,
+        COUNT(*) FILTER (WHERE get_sensor_status(s.last_seen_at, s.expected_interval_s) = 'ATIVO') as active,
         COUNT(*) as total
       FROM estufa.sensor s
-      LEFT JOIN estufa.ambient_status ast ON ast.sensor_id = s.id
-      WHERE s.sensor_type = 'ambient'
     `);
 
     const active_sensors = parseInt(result.rows[0].active || "0");

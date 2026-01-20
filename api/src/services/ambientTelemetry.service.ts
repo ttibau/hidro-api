@@ -1,6 +1,6 @@
 import { getPool } from "../db/config";
 
-export interface AmbientTelemetry {
+export interface Telemetry {
   id: number;
   sensor_id: number;
   received_at: Date;
@@ -11,7 +11,7 @@ export interface AmbientTelemetry {
   raw: any;
 }
 
-export interface CreateAmbientTelemetryDto {
+export interface CreateTelemetryDto {
   sensor_id: number;
   temp_c?: number;
   hum_pct?: number;
@@ -20,7 +20,7 @@ export interface CreateAmbientTelemetryDto {
   raw: any;
 }
 
-export interface AmbientTelemetryFilters {
+export interface TelemetryFilters {
   sensor_id?: number;
   start_date?: string;
   end_date?: string;
@@ -28,11 +28,11 @@ export interface AmbientTelemetryFilters {
   offset?: number;
 }
 
-export class AmbientTelemetryService {
-  async findAll(filters?: AmbientTelemetryFilters): Promise<AmbientTelemetry[]> {
+export class TelemetryService {
+  async findAll(filters?: TelemetryFilters): Promise<Telemetry[]> {
     const pool = getPool();
     
-    let query = "SELECT id, sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw FROM estufa.ambient_telemetry WHERE 1=1";
+    let query = "SELECT id, sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw FROM estufa.telemetry WHERE 1=1";
     const values: any[] = [];
     let paramCount = 1;
 
@@ -65,33 +65,33 @@ export class AmbientTelemetryService {
       values.push(filters.offset);
     }
 
-    const result = await pool.query<AmbientTelemetry>(query, values);
+    const result = await pool.query<Telemetry>(query, values);
     return result.rows;
   }
 
-  async findById(id: number): Promise<AmbientTelemetry | null> {
+  async findById(id: number): Promise<Telemetry | null> {
     const pool = getPool();
-    const result = await pool.query<AmbientTelemetry>(
-      "SELECT id, sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw FROM estufa.ambient_telemetry WHERE id = $1",
+    const result = await pool.query<Telemetry>(
+      "SELECT id, sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw FROM estufa.telemetry WHERE id = $1",
       [id]
     );
     return result.rows[0] || null;
   }
 
-  async findBySensorId(sensorId: number, limit: number = 100): Promise<AmbientTelemetry[]> {
+  async findBySensorId(sensorId: number, limit: number = 100): Promise<Telemetry[]> {
     const pool = getPool();
-    const result = await pool.query<AmbientTelemetry>(
-      "SELECT id, sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw FROM estufa.ambient_telemetry WHERE sensor_id = $1 ORDER BY received_at DESC LIMIT $2",
+    const result = await pool.query<Telemetry>(
+      "SELECT id, sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw FROM estufa.telemetry WHERE sensor_id = $1 ORDER BY received_at DESC LIMIT $2",
       [sensorId, limit]
     );
     return result.rows;
   }
 
-  async create(data: CreateAmbientTelemetryDto): Promise<AmbientTelemetry> {
+  async create(data: CreateTelemetryDto): Promise<Telemetry> {
     const pool = getPool();
     // pg aceita objetos JavaScript diretamente para JSONB
-    const result = await pool.query<AmbientTelemetry>(
-      "INSERT INTO estufa.ambient_telemetry (sensor_id, temp_c, hum_pct, rssi, uptime_s, raw) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw",
+    const result = await pool.query<Telemetry>(
+      "INSERT INTO estufa.telemetry (sensor_id, temp_c, hum_pct, rssi, uptime_s, raw) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, sensor_id, received_at, temp_c, hum_pct, rssi, uptime_s, raw",
       [data.sensor_id, data.temp_c || null, data.hum_pct || null, data.rssi || null, data.uptime_s || null, data.raw]
     );
     return result.rows[0];
@@ -100,7 +100,7 @@ export class AmbientTelemetryService {
   async delete(id: number): Promise<boolean> {
     const pool = getPool();
     const result = await pool.query(
-      "DELETE FROM estufa.ambient_telemetry WHERE id = $1",
+      "DELETE FROM estufa.telemetry WHERE id = $1",
       [id]
     );
     return (result.rowCount ?? 0) > 0;
@@ -109,9 +109,15 @@ export class AmbientTelemetryService {
   async deleteBySensorId(sensorId: number): Promise<number> {
     const pool = getPool();
     const result = await pool.query(
-      "DELETE FROM estufa.ambient_telemetry WHERE sensor_id = $1",
+      "DELETE FROM estufa.telemetry WHERE sensor_id = $1",
       [sensorId]
     );
     return result.rowCount ?? 0;
   }
 }
+
+// Manter compatibilidade com código antigo
+export { TelemetryService as AmbientTelemetryService };
+export type { Telemetry as AmbientTelemetry };
+export type { CreateTelemetryDto as CreateAmbientTelemetryDto };
+export type { TelemetryFilters as AmbientTelemetryFilters };

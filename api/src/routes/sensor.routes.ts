@@ -1,11 +1,11 @@
 import { FastifyInstance } from "fastify";
 import { SensorService } from "../services/sensor.service";
-import { AmbientTelemetryService } from "../services/ambientTelemetry.service";
+import { TelemetryService } from "../services/ambientTelemetry.service";
 import { validateApiKey } from "../middleware/auth.middleware";
 
 export async function sensorRoutes(app: FastifyInstance) {
   const service = new SensorService();
-  const telemetryService = new AmbientTelemetryService();
+  const telemetryService = new TelemetryService();
 
   // Listar todos os sensores
   app.get("/sensors", async (request, reply) => {
@@ -83,18 +83,24 @@ export async function sensorRoutes(app: FastifyInstance) {
   app.post("/sensors", async (request: any, reply) => {
     if (!validateApiKey(request, reply)) return;
     try {
-      const { greenhouse_id, device_key, sensor_type, name } = request.body;
+      const { greenhouse_id, device_key, sensor_type, name, expected_interval_s } = request.body;
 
       if (!greenhouse_id || !device_key || !sensor_type) {
         reply.code(400);
         return { error: "greenhouse_id, device_key e sensor_type são obrigatórios" };
       }
 
-      const sensor = await service.create({ greenhouse_id, device_key, sensor_type, name });
+      const sensor = await service.create({ 
+        greenhouse_id, 
+        device_key, 
+        sensor_type, 
+        name,
+        expected_interval_s 
+      });
       reply.code(201);
       return { data: sensor };
     } catch (error: any) {
-      reply.code(500);
+      reply.code(400);
       return { error: error.message };
     }
   });
@@ -109,8 +115,14 @@ export async function sensorRoutes(app: FastifyInstance) {
         return { error: "ID inválido" };
       }
 
-      const { greenhouse_id, device_key, sensor_type, name } = request.body;
-      const sensor = await service.update(id, { greenhouse_id, device_key, sensor_type, name });
+      const { greenhouse_id, device_key, sensor_type, name, expected_interval_s } = request.body;
+      const sensor = await service.update(id, { 
+        greenhouse_id, 
+        device_key, 
+        sensor_type, 
+        name,
+        expected_interval_s 
+      });
 
       if (!sensor) {
         reply.code(404);
@@ -119,7 +131,7 @@ export async function sensorRoutes(app: FastifyInstance) {
 
       return { data: sensor };
     } catch (error: any) {
-      reply.code(500);
+      reply.code(400);
       return { error: error.message };
     }
   });

@@ -1,9 +1,9 @@
 import { FastifyInstance } from "fastify";
-import { AmbientTelemetryService } from "../services/ambientTelemetry.service";
+import { TelemetryService } from "../services/ambientTelemetry.service";
 import { validateApiKey } from "../middleware/auth.middleware";
 
 export async function ambientTelemetryRoutes(app: FastifyInstance) {
-  const service = new AmbientTelemetryService();
+  const service = new TelemetryService();
 
   // Listar telemetrias com filtros
   app.get("/telemetry/ambient", async (request: any, reply) => {
