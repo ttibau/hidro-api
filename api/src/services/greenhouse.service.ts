@@ -17,6 +17,21 @@ export interface UpdateGreenhouseDto {
   location?: string;
 }
 
+export interface SensorWithDetails {
+  id: number;
+  greenhouse_id: number;
+  device_key: string;
+  sensor_type: string;
+  name: string | null;
+  created_at: Date;
+  status: "online" | "offline" | null;
+  status_updated_at: Date | null;
+  last_telemetry_at: Date | null;
+  temp_c: number | null;
+  hum_pct: number | null;
+  rssi: number | null;
+}
+
 export class GreenhouseService {
   async findAll(): Promise<Greenhouse[]> {
     const pool = getPool();
@@ -79,5 +94,47 @@ export class GreenhouseService {
       [id]
     );
     return (result.rowCount ?? 0) > 0;
+  }
+
+  // Buscar sensores de uma estufa com dados completos
+  async getSensorsWithDetails(greenhouseId: number): Promise<SensorWithDetails[]> {
+    const pool = getPool();
+    
+    // Buscar dados diretamente das tabelas e views conhecidas
+    const result = await pool.query(`
+      SELECT 
+        s.id,
+        s.greenhouse_id,
+        s.device_key,
+        s.sensor_type,
+        s.name,
+        s.created_at,
+        ast.status,
+        ast.updated_at AS status_updated_at,
+        lt.received_at AS last_telemetry_at,
+        lt.temp_c,
+        lt.hum_pct,
+        lt.rssi
+      FROM estufa.sensor s
+      LEFT JOIN estufa.ambient_status ast ON ast.sensor_id = s.id
+      LEFT JOIN estufa.vw_ambient_last_telemetry lt ON lt.sensor_id = s.id
+      WHERE s.greenhouse_id = $1
+      ORDER BY s.id
+    `, [greenhouseId]);
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      greenhouse_id: row.greenhouse_id,
+      device_key: row.device_key,
+      sensor_type: row.sensor_type,
+      name: row.name,
+      created_at: row.created_at,
+      status: row.status,
+      status_updated_at: row.status_updated_at,
+      last_telemetry_at: row.last_telemetry_at,
+      temp_c: row.temp_c,
+      hum_pct: row.hum_pct,
+      rssi: row.rssi,
+    }));
   }
 }

@@ -107,4 +107,29 @@ export async function greenhouseRoutes(app: FastifyInstance) {
       return { error: error.message };
     }
   });
+
+  // Buscar sensores de uma estufa com dados completos
+  app.get("/greenhouses/:id/sensors/details", async (request: any, reply) => {
+    if (!validateApiKey(request, reply)) return;
+    try {
+      const id = parseInt(request.params.id);
+      if (isNaN(id)) {
+        reply.code(400);
+        return { error: "ID inválido" };
+      }
+
+      // Verificar se a estufa existe
+      const greenhouse = await service.findById(id);
+      if (!greenhouse) {
+        reply.code(404);
+        return { error: "Estufa não encontrada" };
+      }
+
+      const sensors = await service.getSensorsWithDetails(id);
+      return { data: sensors };
+    } catch (error: any) {
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
 }
