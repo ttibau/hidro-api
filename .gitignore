@@ -1,0 +1,9 @@
+api/node_modules
+api/dist
+api/package-lock.json
+api/package.json
+api/tsconfig.json
+api/tsconfig.node.json
+api/tsconfig.app.json
+api/tsconfig.spec.json
+api/tsconfig.app.json

@@ -1,5 +1,13 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import { closePool } from "./db/config";
+import { greenhouseRoutes } from "./routes/greenhouse.routes";
+import { sensorRoutes } from "./routes/sensor.routes";
+import { ambientTelemetryRoutes } from "./routes/ambientTelemetry.routes";
+import { ambientStatusRoutes } from "./routes/ambientStatus.routes";
+import { viewsRoutes } from "./routes/views.routes";
+import { dashboardRoutes } from "./routes/dashboard.routes";
+import { ViewsService } from "./services/views.service";
 
 async function start() {
   const app = Fastify({ logger: true });
@@ -19,13 +27,42 @@ async function start() {
     }
   });
 
+  // Health check
   app.get("/health", async () => ({ ok: true }));
 
-  app.get("/metrics/latest", async () => {
-    return { data: [], message: "TODO: implement Postgres query" };
+  // Endpoint de métricas (mantido para compatibilidade)
+  app.get("/metrics/latest", async (request, reply) => {
+    try {
+      const viewsService = new ViewsService();
+      const telemetries = await viewsService.getLastTelemetry();
+      return { data: telemetries };
+    } catch (error: any) {
+      reply.code(500);
+      return { error: error.message };
+    }
   });
 
+  // Registrar todas as rotas
+  await app.register(greenhouseRoutes);
+  await app.register(sensorRoutes);
+  await app.register(ambientTelemetryRoutes);
+  await app.register(ambientStatusRoutes);
+  await app.register(viewsRoutes);
+  await app.register(dashboardRoutes);
+
+  // Graceful shutdown
+  const shutdown = async () => {
+    app.log.info("Encerrando servidor...");
+    await closePool();
+    await app.close();
+    process.exit(0);
+  };
+
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
+
   await app.listen({ port: PORT, host: HOST });
+  app.log.info(`Servidor rodando em http://${HOST}:${PORT}`);
 }
 
 start().catch((err) => {
