@@ -24,7 +24,7 @@ export interface SensorWithDetails {
   sensor_type: string;
   name: string | null;
   created_at: Date;
-  status: "online" | "offline" | null;
+  status: "ATIVO" | "ATRASADO" | "OFFLINE" | null;
   status_updated_at: Date | null;
   last_telemetry_at: Date | null;
   temp_c: number | null;
@@ -100,7 +100,7 @@ export class GreenhouseService {
   async getSensorsWithDetails(greenhouseId: number): Promise<SensorWithDetails[]> {
     const pool = getPool();
     
-    // Buscar dados diretamente das tabelas e views conhecidas
+    // Buscar dados usando tabela telemetry (híbrida) e status lógico
     const result = await pool.query(`
       SELECT 
         s.id,
@@ -109,15 +109,20 @@ export class GreenhouseService {
         s.sensor_type,
         s.name,
         s.created_at,
-        ast.status,
-        ast.updated_at AS status_updated_at,
-        lt.received_at AS last_telemetry_at,
-        lt.temp_c,
-        lt.hum_pct,
-        lt.rssi
+        estufa.get_sensor_status(s.last_seen_at, s.expected_interval_s) AS status,
+        s.last_seen_at AS status_updated_at,
+        t.received_at AS last_telemetry_at,
+        t.temp_c,
+        t.hum_pct,
+        t.rssi
       FROM estufa.sensor s
-      LEFT JOIN estufa.ambient_status ast ON ast.sensor_id = s.id
-      LEFT JOIN estufa.vw_ambient_last_telemetry lt ON lt.sensor_id = s.id
+      LEFT JOIN LATERAL (
+        SELECT received_at, temp_c, hum_pct, rssi
+        FROM estufa.telemetry
+        WHERE sensor_id = s.id
+        ORDER BY received_at DESC
+        LIMIT 1
+      ) t ON true
       WHERE s.greenhouse_id = $1
       ORDER BY s.id
     `, [greenhouseId]);
