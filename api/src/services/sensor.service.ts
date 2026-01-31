@@ -20,6 +20,8 @@ export interface SensorWithStatus extends Sensor {
   last_rssi?: number | null;
   last_uptime_s?: number | null;
   last_received_at?: Date | null;
+  last_ph?: number | null;
+  last_tds?: number | null;
 }
 
 export interface CreateSensorDto {
@@ -68,10 +70,12 @@ export class SensorService {
         t.hum_pct as last_hum_pct,
         t.rssi as last_rssi,
         t.uptime_s as last_uptime_s,
-        t.received_at as last_received_at
+        t.received_at as last_received_at,
+        t.ph as last_ph,
+        t.tds as last_tds
       FROM estufa.sensor s
       LEFT JOIN LATERAL (
-        SELECT temp_c, hum_pct, rssi, uptime_s, received_at
+        SELECT temp_c, hum_pct, rssi, uptime_s, received_at, ph, tds
         FROM estufa.telemetry
         WHERE sensor_id = s.id
         ORDER BY received_at DESC
@@ -102,10 +106,12 @@ export class SensorService {
         t.hum_pct as last_hum_pct,
         t.rssi as last_rssi,
         t.uptime_s as last_uptime_s,
-        t.received_at as last_received_at
+        t.received_at as last_received_at,
+        t.ph as last_ph,
+        t.tds as last_tds
       FROM estufa.sensor s
       LEFT JOIN LATERAL (
-        SELECT temp_c, hum_pct, rssi, uptime_s, received_at
+        SELECT temp_c, hum_pct, rssi, uptime_s, received_at, ph, tds
         FROM estufa.telemetry
         WHERE sensor_id = s.id
         ORDER BY received_at DESC
@@ -137,10 +143,12 @@ export class SensorService {
         t.hum_pct as last_hum_pct,
         t.rssi as last_rssi,
         t.uptime_s as last_uptime_s,
-        t.received_at as last_received_at
+        t.received_at as last_received_at,
+        t.ph as last_ph,
+        t.tds as last_tds
       FROM estufa.sensor s
       LEFT JOIN LATERAL (
-        SELECT temp_c, hum_pct, rssi, uptime_s, received_at
+        SELECT temp_c, hum_pct, rssi, uptime_s, received_at, ph, tds
         FROM estufa.telemetry
         WHERE sensor_id = s.id
         ORDER BY received_at DESC
@@ -173,10 +181,12 @@ export class SensorService {
         t.hum_pct as last_hum_pct,
         t.rssi as last_rssi,
         t.uptime_s as last_uptime_s,
-        t.received_at as last_received_at
+        t.received_at as last_received_at,
+        t.ph as last_ph,
+        t.tds as last_tds
       FROM estufa.sensor s
       LEFT JOIN LATERAL (
-        SELECT temp_c, hum_pct, rssi, uptime_s, received_at
+        SELECT temp_c, hum_pct, rssi, uptime_s, received_at, ph, tds
         FROM estufa.telemetry
         WHERE sensor_id = s.id
         ORDER BY received_at DESC

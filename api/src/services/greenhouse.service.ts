@@ -30,6 +30,8 @@ export interface SensorWithDetails {
   temp_c: number | null;
   hum_pct: number | null;
   rssi: number | null;
+  ph: number | null;
+  tds: number | null;
 }
 
 export class GreenhouseService {
@@ -114,10 +116,12 @@ export class GreenhouseService {
         t.received_at AS last_telemetry_at,
         t.temp_c,
         t.hum_pct,
-        t.rssi
+        t.rssi,
+        t.ph,
+        t.tds
       FROM estufa.sensor s
       LEFT JOIN LATERAL (
-        SELECT received_at, temp_c, hum_pct, rssi
+        SELECT received_at, temp_c, hum_pct, rssi, ph, tds
         FROM estufa.telemetry
         WHERE sensor_id = s.id
         ORDER BY received_at DESC
@@ -140,6 +144,8 @@ export class GreenhouseService {
       temp_c: row.temp_c,
       hum_pct: row.hum_pct,
       rssi: row.rssi,
+      ph: row.ph,
+      tds: row.tds,
     }));
   }
 }
